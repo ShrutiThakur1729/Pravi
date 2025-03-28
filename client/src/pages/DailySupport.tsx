@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import VoiceAssistant from "@/components/common/VoiceAssistant";
+import MusicPlayer from "@/components/common/MusicPlayer";
 import { 
   Bell,
   Clock,
@@ -20,7 +22,9 @@ import {
   MoonStar,
   Volume2,
   VolumeX,
-  AlertCircle
+  AlertCircle,
+  Music,
+  Mic
 } from "lucide-react";
 
 // Timer component
@@ -125,6 +129,12 @@ export default function DailySupport() {
           <TabsTrigger value="focus">Focus & Timers</TabsTrigger>
           <TabsTrigger value="routines">Routines</TabsTrigger>
           <TabsTrigger value="sensory">Sensory Tools</TabsTrigger>
+          <TabsTrigger value="voice">
+            <div className="flex items-center">
+              <Music className="h-4 w-4 mr-1" />
+              Voice & Sound
+            </div>
+          </TabsTrigger>
           <TabsTrigger value="notifications">Reminders</TabsTrigger>
         </TabsList>
         
@@ -702,6 +712,43 @@ export default function DailySupport() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="voice">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <Mic className="h-5 w-5 text-primary-500" />
+                  <CardTitle>Voice Assistant</CardTitle>
+                </div>
+                <CardDescription>
+                  Use voice commands to control the app and get assistance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VoiceAssistant onCommand={(command) => {
+                  console.log("Voice command received:", command);
+                  // Handle command logic here
+                }} />
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <Music className="h-5 w-5 text-primary-500" />
+                  <CardTitle>Focus & Calming Sounds</CardTitle>
+                </div>
+                <CardDescription>
+                  Background sounds to help you focus or relax
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MusicPlayer />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
         

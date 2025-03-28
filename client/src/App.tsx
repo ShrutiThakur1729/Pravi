@@ -33,8 +33,8 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AccessibilityProvider>
+    <AccessibilityProvider>
+      <QueryClientProvider client={queryClient}>
         <div className="min-h-screen flex flex-col bg-neutral-50 text-neutral-800 dark:bg-neutral-900 dark:text-neutral-100 transition-colors">
           <Header />
           <Router />
@@ -42,8 +42,8 @@ function App() {
           <FloatingAssistant />
           <Toaster />
         </div>
-      </AccessibilityProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </AccessibilityProvider>
   );
 }
 
