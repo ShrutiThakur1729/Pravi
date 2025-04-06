@@ -1,190 +1,248 @@
 import 'package:flutter/material.dart';
-import 'package:animated_text_kit/animated_text_kit.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
+import 'screens/splash/splash_screen.dart';
+import 'screens/auth/auth_wrapper.dart';
+import 'screens/home/home_screen.dart';
+import 'widgets/bottom_nav_bar.dart';
+import 'services/auth_service.dart';
 
-// Screens
-import 'screens/home_screen.dart';
-
-void main() {
-  runApp(const PraviApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await Firebase.initializeApp();
+    await dotenv.load();
+  } catch (e) {
+    print('Error initializing app: $e');
+  }
+  
+  runApp(MyApp());
 }
 
-class PraviApp extends StatelessWidget {
-  const PraviApp({super.key});
-
+class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Pravi',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        primaryColor: Color(0xFF6A5ACD),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF69B6D5), // Primary blue color
-          secondary: const Color(0xFFE091B9), // Secondary pink color
-          tertiary: const Color(0xFF87DFD1), // Mint green color
+          seedColor: Color(0xFF6A5ACD),
+          primary: Color(0xFF6A5ACD),
+          secondary: Color(0xFF7B68EE),
         ),
-        useMaterial3: true,
-        fontFamily: GoogleFonts.nunito().fontFamily,
-        textTheme: TextTheme(
-          displayLarge: const TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-          ),
-          displayMedium: GoogleFonts.nunito(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-          bodyLarge: GoogleFonts.nunito(
-            fontSize: 18,
-            fontWeight: FontWeight.w400,
-          ),
-          bodyMedium: GoogleFonts.nunito(
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-          ),
+        fontFamily: 'Poppins',
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
         ),
+        scaffoldBackgroundColor: Colors.white,
       ),
-      home: const SplashScreenSequence(),
+      home: AppStartScreen(),
     );
   }
 }
 
-class SplashScreenSequence extends StatefulWidget {
-  const SplashScreenSequence({super.key});
-
+class AppStartScreen extends StatefulWidget {
   @override
-  State<SplashScreenSequence> createState() => _SplashScreenSequenceState();
+  _AppStartScreenState createState() => _AppStartScreenState();
 }
 
-class _SplashScreenSequenceState extends State<SplashScreenSequence> with SingleTickerProviderStateMixin {
-  int _currentScreen = 0;
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  
+class _AppStartScreenState extends State<AppStartScreen> {
+  bool _showSplash = true;
+
   @override
-  void initState() {
-    super.initState();
-    
-    // Initialize animation controller
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn)
-    );
-    
-    // Start the animation
-    _controller.forward();
-    
-    // Schedule the splash screen sequence
-    Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _currentScreen = 1;
-          _controller.reset();
-          _controller.forward();
-        });
-      }
-    });
-    
-    Timer(const Duration(milliseconds: 3000), () {
-      if (mounted) {
-        setState(() {
-          _currentScreen = 2;
-          _controller.reset();
-          _controller.forward();
-        });
-      }
-    });
-    
-    // Navigate to home screen after the entire sequence
-    Timer(const Duration(milliseconds: 4500), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-              var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 800),
-          ),
-        );
-      }
-    });
+  Widget build(BuildContext context) {
+    if (_showSplash) {
+      return SplashScreen(
+        onComplete: () {
+          setState(() {
+            _showSplash = false;
+          });
+        },
+      );
+    } else {
+      return StreamBuilder(
+        stream: AuthService().authStateChanges,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.active) {
+            if (snapshot.hasData) {
+              return MainApp();
+            } else {
+              return AuthWrapper();
+            }
+          }
+          
+          return Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        },
+      );
+    }
   }
-  
+}
+
+class MainApp extends StatefulWidget {
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  _MainAppState createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> {
+  int _currentIndex = 0;
+  final AuthService _authService = AuthService();
   
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _buildCurrentScreen(),
-        ),
-      ),
+    return FutureBuilder(
+      future: _authService.getUserData(_authService.currentUser?.uid ?? ''),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        
+        final user = snapshot.data;
+        
+        return Scaffold(
+          body: _getScreen(_currentIndex, user),
+          bottomNavigationBar: BottomNavBar(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+          ),
+        );
+      },
     );
   }
   
-  Widget _buildCurrentScreen() {
-    switch (_currentScreen) {
+  Widget _getScreen(int index, user) {
+    switch (index) {
       case 0:
-        // Brain logo
-        return Image.asset(
-          'assets/images/brain_logo.png',
-          width: 200,
-          height: 200,
-        );
+        return HomeScreen(user: user);
       case 1:
-        // P logo
-        return Image.asset(
-          'assets/images/p_logo.png',
-          width: 200,
-          height: 200,
+        // TODO: Implement DailySupportScreen
+        return Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFD4E6FF),
+                  Color(0xFFFAF5FF),
+                ],
+              ),
+            ),
+            child: Center(
+              child: Text(
+                'Daily Support Screen\nComing Soon',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
         );
       case 2:
-        // Pravi text logo
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/images/pravi_text.png',
-              width: 240,
-              height: 100,
+        // TODO: Implement LearningScreen
+        return Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFD4E6FF),
+                  Color(0xFFFAF5FF),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-            AnimatedTextKit(
-              animatedTexts: [
-                TypewriterAnimatedText(
-                  'Supporting Neurodiversity',
-                  textStyle: GoogleFonts.nunito(
-                    fontSize: 20,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w300,
-                  ),
-                  speed: const Duration(milliseconds: 80),
+            child: Center(
+              child: Text(
+                'Learning Screen\nComing Soon',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        );
+      case 3:
+        // TODO: Implement ResourcesScreen
+        return Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFD4E6FF),
+                  Color(0xFFFAF5FF),
+                ],
+              ),
+            ),
+            child: Center(
+              child: Text(
+                'Resources Screen\nComing Soon',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        );
+      case 4:
+        // TODO: Implement SettingsScreen
+        return Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFD4E6FF),
+                  Color(0xFFFAF5FF),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Settings',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 32),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await _authService.signOut();
+                      },
+                      child: Text('Sign Out'),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-              isRepeatingAnimation: false,
+              ),
             ),
-          ],
+          ),
         );
       default:
-        return const SizedBox.shrink();
+        return HomeScreen(user: user);
     }
   }
 }
