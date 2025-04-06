@@ -1,168 +1,139 @@
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GeminiService {
-  static GeminiService? _instance;
-  late final GenerativeModel _model;
-  late final ChatSession _chatSession;
+  final String apiKey;
+  final String modelName = 'gemini-pro';
+  final String baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
   
-  // Private constructor
-  GeminiService._() {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-    if (apiKey.isEmpty) {
-      throw Exception('GEMINI_API_KEY is not set in environment variables');
-    }
-    
-    // Initialize the Gemini model
-    _model = GenerativeModel(
-      model: 'gemini-1.5-pro',
-      apiKey: apiKey,
-      safetySettings: [
-        SafetySetting(
-          category: HarmCategory.harassment,
-          threshold: HarmBlockThreshold.medium,
-        ),
-        SafetySetting(
-          category: HarmCategory.hateSpeech,
-          threshold: HarmBlockThreshold.medium,
-        ),
-      ],
-    );
-    
-    // Start a chat session
-    _chatSession = _model.startChat(
-      history: [
-        Content.text(
-          'You are Haru, an AI assistant designed to help neurodiverse individuals. '
-          'Your tone is friendly, supportive, and patient. You provide clear and '
-          'helpful responses without overwhelming the user. You understand the unique '
-          'challenges faced by people with autism, ADHD, dyslexia, and other '
-          'neurodivergent conditions. Always offer practical advice and emotional support.'
-        ),
-      ],
-    );
-  }
+  GeminiService() : apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
   
-  // Singleton factory
-  factory GeminiService() {
-    _instance ??= GeminiService._();
-    return _instance!;
-  }
-  
-  // Method to send a message and get a response
   Future<String> sendMessage(String message) async {
+    if (apiKey.isEmpty) {
+      return 'API key is not configured. Please check your environment setup.';
+    }
+    
+    final url = '$baseUrl/$modelName:generateContent?key=$apiKey';
+    
+    final Map<String, dynamic> requestBody = {
+      'contents': [
+        {
+          'role': 'user',
+          'parts': [
+            {
+              'text': message
+            }
+          ]
+        }
+      ],
+      'generationConfig': {
+        'temperature': 0.7,
+        'topK': 40,
+        'topP': 0.95,
+        'maxOutputTokens': 1024,
+      },
+      'safetySettings': [
+        {
+          'category': 'HARM_CATEGORY_HARASSMENT',
+          'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+        },
+        {
+          'category': 'HARM_CATEGORY_HATE_SPEECH',
+          'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+        },
+        {
+          'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+          'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+        },
+        {
+          'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
+          'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+        }
+      ]
+    };
+    
     try {
-      final response = await _chatSession.sendMessage(Content.text(message));
-      final responseText = response.text ?? 'I couldn\'t generate a response. Please try again.';
-      return responseText;
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        
+        if (responseData['candidates'] != null && 
+            responseData['candidates'].isNotEmpty && 
+            responseData['candidates'][0]['content'] != null &&
+            responseData['candidates'][0]['content']['parts'] != null &&
+            responseData['candidates'][0]['content']['parts'].isNotEmpty) {
+          return responseData['candidates'][0]['content']['parts'][0]['text'];
+        } else {
+          return 'Sorry, I couldn\'t generate a response. Please try again.';
+        }
+      } else {
+        print('API Error: ${response.statusCode} - ${response.body}');
+        return 'Sorry, I encountered an error. Please try again later.';
+      }
     } catch (e) {
-      // If the API call fails, return a graceful error message
-      return 'I\'m having trouble connecting right now. This is just a demo, but the full version would use Google\'s Gemini AI to provide personalized support.';
+      print('Exception during API call: $e');
+      return 'I\'m having trouble connecting right now. Can we try again in a moment?';
     }
   }
   
-  // Method to generate coping strategies for emotions
   Future<List<String>> generateCopingStrategies(String emotion) async {
-    try {
-      final prompt = 'Generate 3 brief, effective coping strategies for someone feeling $emotion. '
-          'Make them practical and suitable for neurodiverse individuals. Format as a short list.';
-      
-      final response = await _model.generateContent(Content.text(prompt));
-      final responseText = response.text ?? '';
-      
-      // Parse the response into a list of strategies
-      final strategies = responseText
-          .split('\n')
-          .where((line) => line.trim().isNotEmpty)
-          .take(3)
-          .toList();
-      
-      return strategies.isEmpty ? 
-        ['Take deep breaths', 'Go for a short walk', 'Listen to calming music'] : 
-        strategies;
-    } catch (e) {
-      // Return default strategies if the API call fails
-      return [
-        'Take deep breaths',
-        'Go for a short walk',
-        'Listen to calming music',
-      ];
+    final prompt = 'I\'m feeling $emotion. Can you provide 3-5 short coping strategies or techniques to help me manage this emotion? Format each strategy as a brief, actionable sentence.';
+    
+    final response = await sendMessage(prompt);
+    
+    // Parse the response to extract strategies
+    List<String> strategies = [];
+    
+    // Try to extract numbered or bulleted items
+    final numberedRegExp = RegExp(r'\d+\.\s+(.*?)(?=\d+\.|$)', dotAll: true);
+    final bulletedRegExp = RegExp(r'[\-\•]\s+(.*?)(?=[\-\•]|$)', dotAll: true);
+    
+    Iterable<RegExpMatch> matches = numberedRegExp.allMatches(response);
+    
+    if (matches.isEmpty) {
+      matches = bulletedRegExp.allMatches(response);
     }
-  }
-  
-  // Method to generate learning recommendations
-  Future<List<Map<String, String>>> generateLearningRecommendations(List<String> interests) async {
-    try {
-      final interestsText = interests.join(', ');
-      final prompt = 'Generate 3 personalized learning module recommendations for a neurodiverse '
-          'individual with these interests or challenges: $interestsText. '
-          'For each recommendation, provide a title and a brief description. '
-          'Make them specific, practical, and helpful.';
-      
-      final response = await _model.generateContent(Content.text(prompt));
-      final responseText = response.text ?? '';
-      
-      // For demo purposes, return simplified parsing
-      // In a production app, you would want more robust parsing
-      final lines = responseText.split('\n').where((line) => line.trim().isNotEmpty).toList();
-      
-      List<Map<String, String>> recommendations = [];
-      String currentTitle = '';
-      String currentDescription = '';
-      
-      for (var line in lines) {
-        if (line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.') ||
-            line.startsWith('•') || line.startsWith('-')) {
-          // This looks like a title
-          if (currentTitle.isNotEmpty) {
-            // Save the previous recommendation
-            recommendations.add({
-              'title': currentTitle,
-              'description': currentDescription,
-            });
-            currentDescription = '';
-          }
-          currentTitle = line.replaceFirst(RegExp(r'^[1-3]\.|\•|\-'), '').trim();
-        } else if (currentTitle.isNotEmpty) {
-          // This is part of the description
-          currentDescription += ' ' + line.trim();
+    
+    if (matches.isNotEmpty) {
+      for (final match in matches) {
+        final strategy = match.group(1)?.trim();
+        if (strategy != null && strategy.isNotEmpty) {
+          strategies.add(strategy);
         }
       }
-      
-      // Add the last recommendation
-      if (currentTitle.isNotEmpty) {
-        recommendations.add({
-          'title': currentTitle,
-          'description': currentDescription,
-        });
-      }
-      
-      // If we couldn't parse properly, return default recommendations
-      if (recommendations.isEmpty) {
-        return _getDefaultRecommendations();
-      }
-      
-      return recommendations;
-    } catch (e) {
-      return _getDefaultRecommendations();
     }
-  }
-  
-  // Default recommendations when the API fails
-  List<Map<String, String>> _getDefaultRecommendations() {
-    return [
-      {
-        'title': 'Executive Function Skills',
-        'description': 'Learn practical strategies to improve organization, time management, and planning.',
-      },
-      {
-        'title': 'Social Communication',
-        'description': 'Develop techniques for better understanding social cues and expressing yourself clearly.',
-      },
-      {
-        'title': 'Sensory Processing',
-        'description': 'Discover ways to manage sensory sensitivities and create comfortable environments.',
-      },
-    ];
+    
+    // If we couldn't extract structured strategies, just split by lines
+    if (strategies.isEmpty) {
+      strategies = response
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .map((line) => line.trim())
+          .toList();
+    }
+    
+    // Limit to 5 strategies at most
+    strategies = strategies.take(5).toList();
+    
+    // If still empty, provide fallback
+    if (strategies.isEmpty) {
+      strategies = [
+        'Take slow, deep breaths to calm your body and mind.',
+        'Practice a brief mindfulness exercise focusing on your surroundings.',
+        'Try a short walk or gentle movement to shift your energy.',
+        'Write down your thoughts to externalize your feelings.',
+        'Reach out to someone you trust for support.',
+      ];
+    }
+    
+    return strategies;
   }
 }
