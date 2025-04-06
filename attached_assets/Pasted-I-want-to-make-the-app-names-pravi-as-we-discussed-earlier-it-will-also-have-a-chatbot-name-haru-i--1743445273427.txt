@@ -1,0 +1,141 @@
+I want to make the app names pravi as we discussed earlier ,it will also have a chatbot name haru i need to build it in one day of course with help of you ...i want it to be a fully functional app without compromising the features that i'll mention ...we need to use only google technolgies like flutter , firebase , gemini etc whatever else that be needed as much as possible of course again without compromising the quality and also i want it to be a voice control app so that neuro disorder user can use without worrying about it ...and since i have zero idea how to do it ..you need to guide me step by step on it like a child ..every single detail also tell me how much time will it take to build it like in hourse with firebase /or whatever connectivity that will be for data ..important details i have already installed flutter,visual studio,visual studeio code,android studio as well or whatever might be needed and after this mobile application i need to build website on the same as well Full Detailed Feature List of Pravi App
+Core Features
+1. Personalized Dashboard
+User profile with customizable preferences
+Overview of daily tasks and routines
+Visual progress tracking for learning modules
+Quick access to coping strategies
+Motivational messages and daily tips
+2. AI Assistant
+Natural language conversation with AI
+Personalized responses based on user history
+Contextual suggestions for challenges
+Quick links to relevant resources
+Multi-turn conversations with memory
+Support for emotional and practical queries
+3. Daily Planning Tools
+Task management with time-based categories (morning, afternoon, evening)
+Visual task completion tracking
+Priority-based task organization
+Reminders and notifications
+Task difficulty indicators
+Notes and attachments for tasks
+4. Emotion Regulation
+Emotion logging with intensity scale
+Mood tracking with visual charts
+AI-generated coping strategies for specific emotions
+Guided breathing exercises
+Sensory break recommendations
+Crisis resources for intense emotions
+5. Learning Modules
+Structured educational content on neurodiversity topics
+Personalized module recommendations
+Progress tracking per module and section
+Interactive learning content
+Quizzes and knowledge checks
+Completion certificates
+6. Career Support
+Resume and interview preparation tools
+Workplace accommodation guides
+Job search strategies for neurodiverse individuals
+Communication scripts for workplace situations
+Rights and legal information
+Success stories and role models
+7. Daily Support Tools
+Pomodoro timer for focus sessions
+Voice assistant for hands-free interaction
+Music player with focus/calming playlists
+Sensory break timer
+Routine builder
+Checklists for common activities
+8. Resource Library
+Articles, videos, and external links
+Filtered by tags and categories
+Community-recommended resources
+Professional resources (therapists, coaches)
+Support groups and organizations
+Downloadable materials
+Accessibility Features
+9. Comprehensive Accessibility Tools
+Dark/light theme toggle
+Text size adjustment
+High contrast mode
+Motion reduction settings
+Reading guide overlay
+Text-to-speech capabilities
+Voice control for navigation
+10. Community Support
+Success stories from peers
+Moderated discussion forums (planned)
+Event calendar for local support groups (planned)
+Anonymous Q&A
+Mentor connections (planned)
+Technical Features
+11. Cross-Device Synchronization
+Data syncs across devices (planned)
+Offline mode capabilities (partial)
+Secure login and authentication
+Profile and preferences synchronization
+12. Privacy and Security
+End-to-end encryption for sensitive data (planned)
+Granular privacy controls
+Anonymous usage mode option
+Data export and deletion options
+Transparent data usage policies
+13. Integration Capabilities
+Calendar integration (planned)
+Notes app integration (planned)
+Smart device controls (planned)
+Health app data sharing (planned)
+In Development
+14. Advanced AI Features
+Personalized prediction of difficult situations
+AI-generated social scripts
+Visual processing assistance
+Speech pattern analysis for communication help
+Customized skill-building programs
+15. Extended Support Network
+Care team access options
+Therapist collaboration tools
+Family member portal
+Educational institution coordination
+Employer accommodation resource sharing
+This comprehensive feature set makes Pravi a complete support system for neurodiverse individuals across multiple aspects of daily life, learning, career, and social interaction. and also the app should start with it's logo that is with the logo that i have provided in the image attachment first the brain logo then the "p" logo then it's name in the same format ...also for the gui we need something that neuro disorder people will like but also with out logo theme ...it should be nice and the app should be user friendly,voice control, simple to navigate things must have menu with things that aren't that important and also after logo , it must ask for login or new registration ofcourse with all constraints for password , name, date of birth , age and if any neuro disorder none , one or more they have if it's there also in menu they must have option to change the disorder...if it's not in the option then the feature to they can mention it so later we can add it our major options will be 🔹 Major & Common Neurodiverse Disorders to Include
+1️⃣ Autism Spectrum Disorder (ASD)
+Challenges: Social communication, sensory sensitivities, routine dependency.
+Features Needed: Social skill training, sensory-friendly adjustments, structured planners.
+2️⃣ Attention Deficit Hyperactivity Disorder (ADHD)
+Challenges: Focus, impulsivity, time management, executive dysfunction.
+Features Needed: AI-driven task organization, focus timers, gamified executive function training.
+3️⃣ Dyslexia & Other Learning Disabilities
+Challenges: Reading, writing, comprehension, memory retention.
+Features Needed: Text-to-speech, AI-based reading assistance, interactive learning tools.
+4️⃣ Dyspraxia (Developmental Coordination Disorder - DCD)
+Challenges: Motor coordination, planning, organization.
+Features Needed: AI-powered reminders, step-by-step guidance for daily tasks.
+5️⃣ Dyscalculia (Math-Related Learning Disability)
+Challenges: Understanding numbers, calculations, problem-solving.
+Features Needed: Visual math aids, AI-based problem-solving assistance.
+6️⃣ Tourette Syndrome
+Challenges: Involuntary tics, impulse control, social anxiety.
+Features Needed: Mindfulness tools, emotion regulation techniques, social skill support.
+7️⃣ Sensory Processing Disorder (SPD)
+Challenges: Sensory overload (noise, light, textures), emotional regulation.
+Features Needed: AI-driven sensory-friendly mode (brightness, volume, notifications).
+1. AI-Powered Personalized Learning Assistant
+🔹 What it does: Uses AI to adapt learning content based on the user’s cognitive strengths and challenges (for ADHD, dyslexia, autism, etc.).
+🔹 Unique Factor: Unlike general ed-tech tools, this would create customized learning pathways, offer multimodal content (visual, auditory, and interactive), and provide real-time feedback.
+2. Smart Neurodiverse Workplace Integration Platform
+🔹 What it does: Helps neurodiverse individuals find jobs suited to their skills, trains employers on neuroinclusion, and provides AI-driven real-time assistance (task reminders, focus enhancers, emotional regulation tools).
+🔹 Unique Factor: A two-way approach—empowering both employees and employers—ensures better retention and success.
+3. AI-Based Social & Emotional Skill Coach
+🔹 What it does: Uses AI-driven simulations to help neurodiverse individuals improve communication, emotional regulation, and social interactions.
+🔹 Unique Factor: Unlike traditional therapy apps, this can use VR/AR for immersive learning, adapting scenarios in real time.
+4. Adaptive Daily Life Assistant (Mobile & Wearable)
+🔹 What it does: Helps neurodiverse individuals manage schedules, social interactions, and sensory sensitivities through smart AI-driven routines, reminders, and assistive tech integration (smart glasses, noise-canceling triggers).
+🔹 Unique Factor: Works beyond a to-do list by dynamically adjusting plans based on stress levels, environment, and individual needs.
+5. Gamified Executive Function Trainer
+🔹 What it does: A game-based app designed to strengthen executive functions like time management, impulse control, and organization through interactive challenges and real-world rewards.
+🔹 Unique Factor: Fun, engaging, and structured to enhance independence in an organic way.
+And i am using windows ok
+
