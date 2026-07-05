@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage, seedUserDataIfEmpty } from "./storage";
 import { processMessage, generateLearningRecommendations, generateCopingStrategies } from "./gemini";
 import { z } from "zod";
-import { insertTaskSchema, insertEmotionLogSchema, insertChatMessageSchema } from "@shared/schema";
+import { insertTaskSchema, insertEmotionLogSchema, insertChatMessageSchema, insertFocusSessionSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
 
 // Input validation schemas
@@ -291,6 +291,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           suggestions: aiResponse.suggestions,
         },
       });
+    } catch (error: any) {
+      res.status(400).json({ message: "Invalid request", error: error.message });
+    }
+  });
+
+  // FOCUS TIMER ROUTES (scoped to the authenticated user)
+  apiRouter.get("/focus-sessions", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = getUserId(req);
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const sessions = await storage.getFocusSessions(userId, limit);
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(400).json({ message: "Invalid request", error: error.message });
+    }
+  });
+
+  apiRouter.post("/focus-sessions", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = getUserId(req);
+      const sessionData = insertFocusSessionSchema.parse({ ...req.body, userId });
+      const session = await storage.createFocusSession(sessionData);
+      res.status(201).json(session);
+    } catch (error: any) {
+      res.status(400).json({ message: "Invalid request", error: error.message });
+    }
+  });
+
+  // STREAK & ACTIVITY STATS ROUTES (scoped to the authenticated user, computed from real activity)
+  apiRouter.get("/streak", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = getUserId(req);
+      const [streak, focusMinutesToday] = await Promise.all([
+        storage.getStreak(userId),
+        storage.getFocusMinutesToday(userId),
+      ]);
+      res.json({ streak, focusMinutesToday });
     } catch (error: any) {
       res.status(400).json({ message: "Invalid request", error: error.message });
     }

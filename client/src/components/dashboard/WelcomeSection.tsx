@@ -11,18 +11,37 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/use-auth';
+import { Task } from '@shared/schema';
 
 export default function WelcomeSection() {
   const { user, isLoading: isLoadingUser } = useAuth();
   const displayName = user?.firstName || user?.email?.split('@')[0] || 'there';
-  
-  // In a real app, these would be fetched from API
-  const focusScore = 85;
-  const focusChange = 12;
-  const learningStreak = 7;
-  const tasksCompleted = 12;
-  const totalTasks = 15;
-  
+
+  const { data: tasks } = useQuery<Task[]>({
+    queryKey: ['/api/tasks'],
+    queryFn: async () => {
+      const res = await fetch('/api/tasks', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch tasks');
+      return res.json();
+    }
+  });
+
+  const { data: streakData } = useQuery<{ streak: number; focusMinutesToday: number }>({
+    queryKey: ['/api/streak'],
+    queryFn: async () => {
+      const res = await fetch('/api/streak', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch streak');
+      return res.json();
+    }
+  });
+
+  const todayString = new Date().toDateString();
+  const todaysTasks = (tasks || []).filter(t => t.dueDate && new Date(t.dueDate).toDateString() === todayString);
+  const tasksCompleted = todaysTasks.filter(t => t.completed).length;
+  const totalTasks = todaysTasks.length;
+  const streak = streakData?.streak ?? 0;
+  const focusMinutesToday = streakData?.focusMinutesToday ?? 0;
+
   return (
     <Card className="col-span-2 bg-white dark:bg-neutral-800 shadow transition-colors">
       <CardContent className="pt-6">
@@ -49,7 +68,9 @@ export default function WelcomeSection() {
               <>
                 <h2 className="text-2xl font-heading font-semibold mb-2">Welcome back, {displayName}!</h2>
                 <p className="text-neutral-600 dark:text-neutral-400 mb-4">
-                  Your progress this week has been impressive. You've completed 3 learning modules and improved your focus scores by 15%.
+                  {streak > 0
+                    ? `You're on a ${streak}-day streak. Keep showing up for yourself!`
+                    : "Complete a task or focus session today to start your streak."}
                 </p>
               </>
             )}
@@ -57,20 +78,22 @@ export default function WelcomeSection() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
               <div className="bg-neutral-50 dark:bg-neutral-700 p-4 rounded-lg border border-neutral-100 dark:border-neutral-600 transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Today's Focus</span>
+                  <span className="text-sm font-medium">Focus Time Today</span>
                   <FocusIcon className="text-primary-500 dark:text-primary-400 h-4 w-4" />
                 </div>
-                <p className="text-2xl font-semibold">{focusScore}%</p>
-                <p className="text-xs text-success">▲ {focusChange}% from yesterday</p>
+                <p className="text-2xl font-semibold">{focusMinutesToday} min</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">From completed focus sessions</p>
               </div>
               
               <div className="bg-neutral-50 dark:bg-neutral-700 p-4 rounded-lg border border-neutral-100 dark:border-neutral-600 transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Learning Streak</span>
+                  <span className="text-sm font-medium">Daily Streak</span>
                   <Flame className="text-warning h-4 w-4" />
                 </div>
-                <p className="text-2xl font-semibold">{learningStreak} days</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">Keep it going!</p>
+                <p className="text-2xl font-semibold">{streak} {streak === 1 ? 'day' : 'days'}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {streak > 0 ? 'Keep it going!' : 'Start today'}
+                </p>
               </div>
               
               <div className="bg-neutral-50 dark:bg-neutral-700 p-4 rounded-lg border border-neutral-100 dark:border-neutral-600 transition-colors">

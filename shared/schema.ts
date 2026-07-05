@@ -114,6 +114,19 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
   timestamp: true,
 });
 
+// Focus Timer Sessions schema (real Pomodoro-style focus sessions users actually complete)
+export const focusSessions = pgTable("focus_sessions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  durationMinutes: integer("duration_minutes").notNull(),
+  completedAt: timestamp("completed_at").defaultNow(),
+});
+
+export const insertFocusSessionSchema = createInsertSchema(focusSessions).omit({
+  id: true,
+  completedAt: true,
+});
+
 // Onboarding state (per-user, tracks whether the intro tour has been completed)
 export const userOnboarding = pgTable("user_onboarding", {
   userId: varchar("user_id").primaryKey().references(() => users.id),
@@ -144,6 +157,9 @@ export type InsertResource = z.infer<typeof insertResourceSchema>;
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
+export type FocusSession = typeof focusSessions.$inferSelect;
+export type InsertFocusSession = z.infer<typeof insertFocusSessionSchema>;
 
 export type UserOnboarding = typeof userOnboarding.$inferSelect;
 export type InsertUserOnboarding = z.infer<typeof insertUserOnboardingSchema>;

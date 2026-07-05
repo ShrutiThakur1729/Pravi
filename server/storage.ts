@@ -1,5 +1,5 @@
 import {
-  tasks, learningModules, moduleSections, userProgress, emotionLogs, resources, chatMessages, userOnboarding,
+  tasks, learningModules, moduleSections, userProgress, emotionLogs, resources, chatMessages, userOnboarding, focusSessions,
   Task, InsertTask,
   LearningModule, InsertLearningModule,
   ModuleSection, InsertModuleSection,
@@ -8,9 +8,10 @@ import {
   Resource, InsertResource,
   ChatMessage, InsertChatMessage,
   UserOnboarding,
+  FocusSession, InsertFocusSession,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte } from "drizzle-orm";
 
 export interface IStorage {
   // Task methods
@@ -52,6 +53,14 @@ export interface IStorage {
   // Onboarding methods
   getOnboardingStatus(userId: string): Promise<UserOnboarding | undefined>;
   markOnboardingComplete(userId: string): Promise<UserOnboarding>;
+
+  // Focus session methods
+  createFocusSession(session: InsertFocusSession): Promise<FocusSession>;
+  getFocusSessions(userId: string, limit?: number): Promise<FocusSession[]>;
+  getFocusMinutesToday(userId: string): Promise<number>;
+
+  // Streak methods (computed from real activity: completed tasks, focus sessions, emotion check-ins)
+  getStreak(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -222,6 +231,77 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return status;
+  }
+
+  // FOCUS SESSION METHODS
+  async createFocusSession(session: InsertFocusSession): Promise<FocusSession> {
+    const [newSession] = await db.insert(focusSessions).values(session).returning();
+    return newSession;
+  }
+
+  async getFocusSessions(userId: string, limit?: number): Promise<FocusSession[]> {
+    const query = db
+      .select()
+      .from(focusSessions)
+      .where(eq(focusSessions.userId, userId))
+      .orderBy(desc(focusSessions.completedAt));
+
+    if (limit) {
+      return query.limit(limit);
+    }
+    return query;
+  }
+
+  async getFocusMinutesToday(userId: string): Promise<number> {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const sessions = await db
+      .select()
+      .from(focusSessions)
+      .where(and(eq(focusSessions.userId, userId), gte(focusSessions.completedAt, startOfDay)));
+
+    return sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+  }
+
+  // STREAK METHODS
+  async getStreak(userId: string): Promise<number> {
+    const toDateString = (d: Date) => {
+      const local = new Date(d);
+      local.setHours(0, 0, 0, 0);
+      return local.toDateString();
+    };
+
+    const activeDays = new Set<string>();
+
+    const completedTasks = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), eq(tasks.completed, true)));
+    for (const t of completedTasks) {
+      if (t.dueDate) activeDays.add(toDateString(new Date(t.dueDate)));
+    }
+
+    const sessions = await db.select().from(focusSessions).where(eq(focusSessions.userId, userId));
+    for (const s of sessions) {
+      if (s.completedAt) activeDays.add(toDateString(new Date(s.completedAt)));
+    }
+
+    const logs = await db.select().from(emotionLogs).where(eq(emotionLogs.userId, userId));
+    for (const l of logs) {
+      if (l.timestamp) activeDays.add(toDateString(new Date(l.timestamp)));
+    }
+
+    let streak = 0;
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+
+    while (activeDays.has(cursor.toDateString())) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    return streak;
   }
 }
 

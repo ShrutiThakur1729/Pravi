@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { Task, FocusSession } from '@shared/schema';
 import AccessibilityBar from "@/components/layout/AccessibilityBar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
@@ -27,11 +33,67 @@ import {
   Mic
 } from "lucide-react";
 
-// Timer component
+// Focus Timer component - a real countdown that persists completed sessions
 function PomodoroTimer() {
+  const { toast } = useToast();
+  const [selectedMinutes, setSelectedMinutes] = useState(25);
+  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [timerActive, setTimerActive] = useState(false);
-  const [timerMinutes, setTimerMinutes] = useState(25);
-  
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const createSessionMutation = useMutation({
+    mutationFn: async (durationMinutes: number) => {
+      return await apiRequest('POST', '/api/focus-sessions', { durationMinutes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/streak'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/focus-sessions'] });
+    }
+  });
+
+  useEffect(() => {
+    if (timerActive) {
+      intervalRef.current = setInterval(() => {
+        setSecondsLeft((prev) => {
+          if (prev <= 1) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            setTimerActive(false);
+            createSessionMutation.mutate(selectedMinutes);
+            toast({
+              title: "Focus session complete!",
+              description: `You focused for ${selectedMinutes} minutes. Great work.`
+            });
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [timerActive]);
+
+  const handleSelectDuration = (minutes: number) => {
+    if (timerActive) return;
+    setSelectedMinutes(minutes);
+    setSecondsLeft(minutes * 60);
+  };
+
+  const handleToggleTimer = () => {
+    setTimerActive(!timerActive);
+  };
+
+  const handleReset = () => {
+    setTimerActive(false);
+    setSecondsLeft(selectedMinutes * 60);
+  };
+
+  const minutesDisplay = Math.floor(secondsLeft / 60).toString().padStart(2, '0');
+  const secondsDisplay = (secondsLeft % 60).toString().padStart(2, '0');
+
   return (
     <Card>
       <CardHeader>
@@ -42,66 +104,226 @@ function PomodoroTimer() {
         <div className="flex flex-col items-center">
           <div className="w-40 h-40 rounded-full border-8 border-primary-200 dark:border-primary-800 flex items-center justify-center mb-4">
             <div className="text-center">
-              <div className="text-4xl font-bold">{timerActive ? timerMinutes : 25}:00</div>
-              <div className="text-sm text-neutral-500 dark:text-neutral-400">Focus Session</div>
+              <div className="text-4xl font-bold">{minutesDisplay}:{secondsDisplay}</div>
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                {timerActive ? 'Focusing...' : 'Focus Session'}
+              </div>
             </div>
           </div>
           
           <div className="grid grid-cols-3 gap-2 mb-4 w-full max-w-xs">
-            <Button variant="outline" onClick={() => setTimerMinutes(15)}>15 min</Button>
-            <Button variant="outline" onClick={() => setTimerMinutes(25)}>25 min</Button>
-            <Button variant="outline" onClick={() => setTimerMinutes(40)}>40 min</Button>
+            <Button variant={selectedMinutes === 15 ? 'default' : 'outline'} onClick={() => handleSelectDuration(15)} disabled={timerActive}>15 min</Button>
+            <Button variant={selectedMinutes === 25 ? 'default' : 'outline'} onClick={() => handleSelectDuration(25)} disabled={timerActive}>25 min</Button>
+            <Button variant={selectedMinutes === 40 ? 'default' : 'outline'} onClick={() => handleSelectDuration(40)} disabled={timerActive}>40 min</Button>
           </div>
           
-          <Button 
-            className="w-full max-w-xs"
-            onClick={() => setTimerActive(!timerActive)}
-          >
-            {timerActive ? 'Pause Timer' : 'Start Focus Session'}
-          </Button>
+          <div className="flex gap-2 w-full max-w-xs">
+            <Button 
+              className="flex-1"
+              onClick={handleToggleTimer}
+            >
+              {timerActive ? 'Pause Timer' : 'Start Focus Session'}
+            </Button>
+            <Button variant="outline" onClick={handleReset}>
+              Reset
+            </Button>
+          </div>
         </div>
-        
-        <div className="space-y-4">
-          <h3 className="font-medium text-sm">Timer Settings</h3>
-          
+      </CardContent>
+    </Card>
+  );
+}
+
+// Recent focus sessions, pulled from real completed sessions
+function RecentFocusSessions() {
+  const { data: sessions, isPending } = useQuery<FocusSession[]>({
+    queryKey: ['/api/focus-sessions'],
+    queryFn: async () => {
+      const res = await fetch('/api/focus-sessions?limit=5', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch focus sessions');
+      return res.json();
+    }
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Focus Sessions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isPending ? (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">Loading...</p>
+        ) : sessions && sessions.length > 0 ? (
+          sessions.map((session) => (
+            <div key={session.id} className="flex items-center justify-between text-sm p-2 rounded-lg border border-neutral-200 dark:border-neutral-700">
+              <span>{session.durationMinutes} minute session</span>
+              <span className="text-neutral-500 dark:text-neutral-400">
+                {session.completedAt ? format(new Date(session.completedAt), 'MMM d, h:mm a') : ''}
+              </span>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            No focus sessions completed yet. Start your first one above!
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Today's real focus plan, built from the user's actual tasks
+function TodaysFocusPlan() {
+  const { data: tasks, isPending } = useQuery<Task[]>({
+    queryKey: ['/api/tasks'],
+    queryFn: async () => {
+      const res = await fetch('/api/tasks', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch tasks');
+      return res.json();
+    }
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
+      return await apiRequest('PUT', `/api/tasks/${id}`, { completed });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/streak'] });
+    }
+  });
+
+  const todayString = new Date().toDateString();
+  const todaysTasks = (tasks || [])
+    .filter(t => t.dueDate && new Date(t.dueDate).toDateString() === todayString)
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle>Today's Focus Plan</CardTitle>
+        <CardDescription>Your real tasks for today, pulled from your Daily Planner</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isPending ? (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 py-6 text-center">Loading today's plan...</p>
+        ) : todaysTasks.length === 0 ? (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 py-6 text-center">
+            No tasks scheduled for today yet. Add tasks from your Daily Planner to see them here.
+          </p>
+        ) : (
+          <div className="space-y-3 mb-2">
+            {todaysTasks.map((task, index) => (
+              <div key={task.id} className="p-3 border border-neutral-200 dark:border-neutral-700 rounded-lg flex items-center">
+                <Checkbox
+                  checked={!!task.completed}
+                  onCheckedChange={() => updateTaskMutation.mutate({ id: task.id, completed: !task.completed })}
+                  className="mr-3"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className={`font-medium ${task.completed ? 'line-through text-neutral-500 dark:text-neutral-400' : ''}`}>
+                      {task.title}
+                    </span>
+                    {task.timeOfDay && (
+                      <Badge variant="outline" className="capitalize">{task.timeOfDay}</Badge>
+                    )}
+                  </div>
+                  {task.description && (
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">{task.description}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Upcoming (not yet completed) tasks across all days
+function UpcomingTasks() {
+  const { data: tasks, isPending } = useQuery<Task[]>({
+    queryKey: ['/api/tasks'],
+    queryFn: async () => {
+      const res = await fetch('/api/tasks', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch tasks');
+      return res.json();
+    }
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
+      return await apiRequest('PUT', `/api/tasks/${id}`, { completed });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/streak'] });
+    }
+  });
+
+  const upcoming = (tasks || []).filter(t => !t.completed).slice(0, 5);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center space-x-2">
+          <ListTodo className="h-5 w-5 text-primary-500" />
+          <CardTitle>Upcoming Tasks</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isPending ? (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">Loading...</p>
+        ) : upcoming.length === 0 ? (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">You're all caught up! No pending tasks.</p>
+        ) : (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="break-duration">Break Duration</Label>
-              <span className="text-sm text-neutral-500 dark:text-neutral-400">5 minutes</span>
-            </div>
-            <Slider 
-              id="break-duration"
-              defaultValue={[5]} 
-              max={15} 
-              min={1} 
-              step={1} 
-              className="w-full" 
-            />
+            {upcoming.map((task) => (
+              <div key={task.id} className="flex items-center p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                <Checkbox
+                  checked={!!task.completed}
+                  onCheckedChange={() => updateTaskMutation.mutate({ id: task.id, completed: !task.completed })}
+                  className="mr-2"
+                />
+                <span className="text-sm">{task.title}</span>
+              </div>
+            ))}
           </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Bell className="h-4 w-4" />
-              <Label htmlFor="timer-sounds">Timer Sounds</Label>
-            </div>
-            <Switch id="timer-sounds" defaultChecked />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Real streak card, driven by the same activity-based streak calculation as the dashboard
+function RoutineStreakCard() {
+  const { data: streakData, isPending } = useQuery<{ streak: number; focusMinutesToday: number }>({
+    queryKey: ['/api/streak'],
+    queryFn: async () => {
+      const res = await fetch('/api/streak', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch streak');
+      return res.json();
+    }
+  });
+  const streak = streakData?.streak ?? 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Streak</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div>
+          <div className="flex justify-between mb-1">
+            <span className="text-sm">Current Streak</span>
+            <span className="text-sm font-medium">{isPending ? '...' : `${streak} ${streak === 1 ? 'day' : 'days'}`}</span>
           </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="h-4 w-4" />
-              <Label htmlFor="visual-alerts">Visual Alerts</Label>
-            </div>
-            <Switch id="visual-alerts" defaultChecked />
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <CheckCircle2 className="h-4 w-4" />
-              <Label htmlFor="auto-break">Auto-start Breaks</Label>
-            </div>
-            <Switch id="auto-break" />
-          </div>
+          <Progress value={Math.min(streak * 10, 100)} className="h-2" />
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+            Based on days you've completed a task, focus session, or mood check-in
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -110,6 +332,16 @@ function PomodoroTimer() {
 
 // Daily Support page component
 export default function DailySupport() {
+  const { data: streakData } = useQuery<{ streak: number; focusMinutesToday: number }>({
+    queryKey: ['/api/streak'],
+    queryFn: async () => {
+      const res = await fetch('/api/streak', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch streak');
+      return res.json();
+    }
+  });
+  const streak = streakData?.streak ?? 0;
+
   return (
     <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Accessibility Controls */}
@@ -141,161 +373,11 @@ export default function DailySupport() {
         <TabsContent value="focus">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Today's Focus Plan</CardTitle>
-                  <CardDescription>Break your day into manageable tasks</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4 mb-6">
-                    <div className="p-3 border border-neutral-200 dark:border-neutral-700 rounded-lg flex items-center">
-                      <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 mr-3">
-                        1
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Morning Focus Block</span>
-                          <Badge variant="outline">9:00 - 11:00 AM</Badge>
-                        </div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                          Job interview preparation
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="p-3 border border-neutral-200 dark:border-neutral-700 rounded-lg flex items-center">
-                      <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 mr-3">
-                        2
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Movement Break</span>
-                          <Badge variant="outline">11:00 - 11:30 AM</Badge>
-                        </div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                          Walking or stretching
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="p-3 border border-neutral-200 dark:border-neutral-700 rounded-lg flex items-center">
-                      <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 mr-3">
-                        3
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Afternoon Focus Block</span>
-                          <Badge variant="outline">1:00 - 3:00 PM</Badge>
-                        </div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                          Complete executive function learning module
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="p-3 border border-neutral-200 dark:border-neutral-700 rounded-lg flex items-center">
-                      <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 mr-3">
-                        4
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Evening Wind-Down</span>
-                          <Badge variant="outline">9:00 - 10:00 PM</Badge>
-                        </div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                          No screens, reading, calming activities
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <Button className="w-full">
-                    Customize Focus Plan
-                  </Button>
-                </CardContent>
-              </Card>
+              <TodaysFocusPlan />
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center space-x-2">
-                      <Brain className="h-5 w-5 text-primary-500" />
-                      <CardTitle>Executive Function</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>Task Initiation</span>
-                        <span className="text-neutral-500">7/10</span>
-                      </div>
-                      <Progress value={70} className="h-2" />
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>Working Memory</span>
-                        <span className="text-neutral-500">6/10</span>
-                      </div>
-                      <Progress value={60} className="h-2" />
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>Time Management</span>
-                        <span className="text-neutral-500">8/10</span>
-                      </div>
-                      <Progress value={80} className="h-2" />
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span>Emotional Regulation</span>
-                        <span className="text-neutral-500">7/10</span>
-                      </div>
-                      <Progress value={70} className="h-2" />
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" className="w-full">
-                      View Detailed Analysis
-                    </Button>
-                  </CardFooter>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center space-x-2">
-                      <ListTodo className="h-5 w-5 text-primary-500" />
-                      <CardTitle>Task Breakdown</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="p-3 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                        <h3 className="font-medium mb-2">Job Interview Preparation</h3>
-                        <div className="space-y-2">
-                          <div className="flex items-center">
-                            <CheckCircle2 className="h-4 w-4 text-success mr-2" />
-                            <span className="text-sm text-neutral-500 dark:text-neutral-400">Research company (15 min)</span>
-                          </div>
-                          <div className="flex items-center">
-                            <div className="h-4 w-4 border border-neutral-300 dark:border-neutral-600 rounded-full mr-2"></div>
-                            <span className="text-sm">Practice responses (30 min)</span>
-                          </div>
-                          <div className="flex items-center">
-                            <div className="h-4 w-4 border border-neutral-300 dark:border-neutral-600 rounded-full mr-2"></div>
-                            <span className="text-sm">Prepare questions (15 min)</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <Button variant="outline" className="w-full">
-                        Add New Task Breakdown
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <UpcomingTasks />
+                <RecentFocusSessions />
               </div>
             </div>
             
@@ -456,36 +538,7 @@ export default function DailySupport() {
             </div>
             
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Routine Stats</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm">Weekly Completion Rate</span>
-                      <span className="text-sm font-medium">85%</span>
-                    </div>
-                    <Progress value={85} className="h-2" />
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm">Consistency Score</span>
-                      <span className="text-sm font-medium">73%</span>
-                    </div>
-                    <Progress value={73} className="h-2" />
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm">Current Streak</span>
-                      <span className="text-sm font-medium">5 days</span>
-                    </div>
-                    <Progress value={71} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
+              <RoutineStreakCard />
               
               <Card>
                 <CardHeader>
