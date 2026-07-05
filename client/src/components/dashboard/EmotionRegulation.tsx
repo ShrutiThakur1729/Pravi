@@ -14,10 +14,6 @@ import {
 import { format, subDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
-type EmotionRegulationProps = {
-  userId: number;
-};
-
 type Emotion = {
   name: string;
   emoji: string;
@@ -31,14 +27,14 @@ const emotions: Emotion[] = [
   { name: 'Frustrated', emoji: '😤' },
 ];
 
-export default function EmotionRegulation({ userId }: EmotionRegulationProps) {
+export default function EmotionRegulation() {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const { toast } = useToast();
   
   const { data: emotionLogs, isPending: isLoadingEmotions } = useQuery({
-    queryKey: ['/api/emotions', userId],
+    queryKey: ['/api/emotions'],
     queryFn: async () => {
-      const res = await fetch(`/api/emotions/${userId}?limit=7`);
+      const res = await fetch('/api/emotions?limit=7', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch emotion logs');
       return res.json();
     }
@@ -47,13 +43,12 @@ export default function EmotionRegulation({ userId }: EmotionRegulationProps) {
   const trackEmotionMutation = useMutation({
     mutationFn: async (emotion: string) => {
       return await apiRequest('POST', '/api/emotions', {
-        userId,
         emotion,
         intensity: 5, // Default intensity
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/emotions', userId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/emotions'] });
       toast({
         title: "Emotion tracked",
         description: `You're feeling ${selectedEmotion}. Take care of yourself!`

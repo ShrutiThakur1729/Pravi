@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
+import { useAuth } from '@/hooks/use-auth';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu, Sun, Moon } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Menu, Sun, Moon, LogOut } from 'lucide-react';
 import praviLogo from '@/assets/pravi-logo.webp';
 
 const navItems = [
@@ -17,7 +25,12 @@ const navItems = [
 export default function Header() {
   const [location] = useLocation();
   const { theme, toggleTheme } = useAccessibility();
+  const { user, logout, isLoggingOut } = useAuth();
   const [mounted, setMounted] = useState(false);
+
+  const initials =
+    (user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase() +
+    (user?.lastName?.[0]?.toUpperCase() || '');
 
   // Avoid hydration mismatch
   useEffect(() => {
@@ -72,13 +85,33 @@ export default function Header() {
             )}
             
             {/* User menu */}
-            <div className="relative">
-              <button className="flex items-center focus:outline-none">
-                <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-                  <span className="text-primary-600 dark:text-primary-300 font-medium">JS</span>
-                </div>
-              </button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center focus:outline-none" aria-label="User menu">
+                  <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                    <span className="text-primary-600 dark:text-primary-300 font-medium">{initials}</span>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {user?.email && (
+                  <>
+                    <div className="px-2 py-1.5 text-sm text-neutral-500 dark:text-neutral-400 truncate">
+                      {user.email}
+                    </div>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  onClick={() => logout()}
+                  disabled={isLoggingOut}
+                  className="cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  {isLoggingOut ? 'Logging out...' : 'Log out'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             {/* Mobile menu button */}
             <Sheet>

@@ -23,7 +23,7 @@ function extractJson(text: string): any {
  * Process a user message and generate a response from the AI assistant (Haru)
  */
 export async function processMessage(
-  userId: number,
+  userId: string,
   message: string,
   previousMessages: Array<{ content: string; isUser: boolean }> = [],
 ): Promise<AIResponse> {
@@ -73,7 +73,7 @@ export async function processMessage(
  * Generate a personalized learning recommendation
  */
 export async function generateLearningRecommendations(
-  userId: number,
+  userId: string,
   interests: string[],
 ): Promise<any> {
   try {

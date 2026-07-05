@@ -1,27 +1,15 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User schema
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  name: text("name"),
-  email: text("email"),
-  preferences: json("preferences"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-});
+// Re-export Replit Auth user/session tables & types (mandatory for auth integration)
+export * from "./models/auth";
+import { users } from "./models/auth";
 
 // Tasks schema
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
   completed: boolean("completed").default(false),
@@ -68,7 +56,7 @@ export const insertModuleSectionSchema = createInsertSchema(moduleSections).omit
 // User Progress schema
 export const userProgress = pgTable("user_progress", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   moduleId: integer("module_id").notNull(),
   currentSection: integer("current_section").default(0),
   percentComplete: integer("percent_complete").default(0),
@@ -83,7 +71,7 @@ export const insertUserProgressSchema = createInsertSchema(userProgress).omit({
 // Emotion Tracking schema
 export const emotionLogs = pgTable("emotion_logs", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   emotion: text("emotion").notNull(),
   intensity: integer("intensity").default(5),
   notes: text("notes"),
@@ -115,7 +103,7 @@ export const insertResourceSchema = createInsertSchema(resources).omit({
 // AI Chat History schema
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
   isUser: boolean("is_user").default(true),
   timestamp: timestamp("timestamp").defaultNow(),
@@ -126,10 +114,16 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
   timestamp: true,
 });
 
-// Export types
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
+// Onboarding state (per-user, tracks whether the intro tour has been completed)
+export const userOnboarding = pgTable("user_onboarding", {
+  userId: varchar("user_id").primaryKey().references(() => users.id),
+  tourCompleted: boolean("tour_completed").default(false),
+  completedAt: timestamp("completed_at"),
+});
 
+export const insertUserOnboardingSchema = createInsertSchema(userOnboarding);
+
+// Export types
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 
@@ -150,3 +144,6 @@ export type InsertResource = z.infer<typeof insertResourceSchema>;
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
+export type UserOnboarding = typeof userOnboarding.$inferSelect;
+export type InsertUserOnboarding = z.infer<typeof insertUserOnboardingSchema>;

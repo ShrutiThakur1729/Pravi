@@ -1,26 +1,20 @@
 import {
-  users, tasks, learningModules, moduleSections, userProgress, emotionLogs, resources, chatMessages,
-  User, InsertUser,
+  tasks, learningModules, moduleSections, userProgress, emotionLogs, resources, chatMessages, userOnboarding,
   Task, InsertTask,
   LearningModule, InsertLearningModule,
   ModuleSection, InsertModuleSection,
   UserProgress, InsertUserProgress,
   EmotionLog, InsertEmotionLog,
   Resource, InsertResource,
-  ChatMessage, InsertChatMessage
+  ChatMessage, InsertChatMessage,
+  UserOnboarding,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 
 export interface IStorage {
-  // User methods
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  updateUserPreferences(id: number, preferences: any): Promise<User | undefined>;
-
   // Task methods
-  getTasks(userId: number): Promise<Task[]>;
+  getTasks(userId: string): Promise<Task[]>;
   getTaskById(id: number): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: number, task: Partial<Task>): Promise<Task | undefined>;
@@ -37,12 +31,12 @@ export interface IStorage {
   updateModuleSection(id: number, section: Partial<ModuleSection>): Promise<ModuleSection | undefined>;
 
   // User progress methods
-  getUserProgress(userId: number, moduleId: number): Promise<UserProgress | undefined>;
-  updateUserProgress(userId: number, moduleId: number, progress: Partial<UserProgress>): Promise<UserProgress | undefined>;
+  getUserProgress(userId: string, moduleId: number): Promise<UserProgress | undefined>;
+  updateUserProgress(userId: string, moduleId: number, progress: Partial<UserProgress>): Promise<UserProgress | undefined>;
   createUserProgress(progress: InsertUserProgress): Promise<UserProgress>;
 
   // Emotion tracking methods
-  getEmotionLogs(userId: number, limit?: number): Promise<EmotionLog[]>;
+  getEmotionLogs(userId: string, limit?: number): Promise<EmotionLog[]>;
   createEmotionLog(log: InsertEmotionLog): Promise<EmotionLog>;
 
   // Resource methods
@@ -52,38 +46,17 @@ export interface IStorage {
   createResource(resource: InsertResource): Promise<Resource>;
 
   // Chat methods
-  getChatMessages(userId: number, limit?: number): Promise<ChatMessage[]>;
+  getChatMessages(userId: string, limit?: number): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+
+  // Onboarding methods
+  getOnboardingStatus(userId: string): Promise<UserOnboarding | undefined>;
+  markOnboardingComplete(userId: string): Promise<UserOnboarding>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // USER METHODS
-  async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
-  }
-
-  async updateUserPreferences(id: number, preferences: any): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({ preferences })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
-  }
-
   // TASK METHODS
-  async getTasks(userId: number): Promise<Task[]> {
+  async getTasks(userId: string): Promise<Task[]> {
     return db.select().from(tasks).where(eq(tasks.userId, userId));
   }
 
@@ -150,7 +123,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // USER PROGRESS METHODS
-  async getUserProgress(userId: number, moduleId: number): Promise<UserProgress | undefined> {
+  async getUserProgress(userId: string, moduleId: number): Promise<UserProgress | undefined> {
     const [progress] = await db
       .select()
       .from(userProgress)
@@ -158,7 +131,7 @@ export class DatabaseStorage implements IStorage {
     return progress;
   }
 
-  async updateUserProgress(userId: number, moduleId: number, updatedFields: Partial<UserProgress>): Promise<UserProgress | undefined> {
+  async updateUserProgress(userId: string, moduleId: number, updatedFields: Partial<UserProgress>): Promise<UserProgress | undefined> {
     const [updatedProgress] = await db
       .update(userProgress)
       .set({ ...updatedFields, lastAccessed: new Date() })
@@ -173,7 +146,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // EMOTION TRACKING METHODS
-  async getEmotionLogs(userId: number, limit?: number): Promise<EmotionLog[]> {
+  async getEmotionLogs(userId: string, limit?: number): Promise<EmotionLog[]> {
     const query = db
       .select()
       .from(emotionLogs)
@@ -215,7 +188,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // CHAT METHODS
-  async getChatMessages(userId: number, limit?: number): Promise<ChatMessage[]> {
+  async getChatMessages(userId: string, limit?: number): Promise<ChatMessage[]> {
     const messages = await db
       .select()
       .from(chatMessages)
@@ -232,90 +205,39 @@ export class DatabaseStorage implements IStorage {
     const [newMessage] = await db.insert(chatMessages).values(message).returning();
     return newMessage;
   }
+
+  // ONBOARDING METHODS
+  async getOnboardingStatus(userId: string): Promise<UserOnboarding | undefined> {
+    const [status] = await db.select().from(userOnboarding).where(eq(userOnboarding.userId, userId));
+    return status;
+  }
+
+  async markOnboardingComplete(userId: string): Promise<UserOnboarding> {
+    const [status] = await db
+      .insert(userOnboarding)
+      .values({ userId, tourCompleted: true, completedAt: new Date() })
+      .onConflictDoUpdate({
+        target: userOnboarding.userId,
+        set: { tourCompleted: true, completedAt: new Date() },
+      })
+      .returning();
+    return status;
+  }
 }
 
 export const storage = new DatabaseStorage();
 
 /**
- * Seed the database with demo data on first run (only if empty).
- * This keeps the demo experience intact while persisting real, live data going forward.
+ * Seed shared/public content (learning modules, sections, resources) on first run.
+ * This data is not tied to any individual user, so it's safe to seed once for the whole app.
  */
 export async function seedDatabaseIfEmpty() {
-  const existingUsers = await db.select().from(users).limit(1);
-  if (existingUsers.length > 0) {
+  const existingModules = await db.select().from(learningModules).limit(1);
+  if (existingModules.length > 0) {
     return;
   }
 
-  console.log("Seeding database with initial demo data...");
-
-  const [demoUser] = await db
-    .insert(users)
-    .values({
-      username: "jamie",
-      password: "password123",
-      name: "Jamie Smith",
-      email: "jamie@example.com",
-      preferences: { theme: "light", textSize: "medium", highContrast: false, reduceMotion: false },
-    })
-    .returning();
-
-  const today = new Date();
-
-  await db.insert(tasks).values([
-    {
-      userId: demoUser.id,
-      title: "Morning meditation",
-      description: "10 minutes of mindfulness meditation",
-      completed: true,
-      dueDate: today,
-      timeOfDay: "morning",
-      priority: 1,
-    },
-    {
-      userId: demoUser.id,
-      title: "Check email and calendar",
-      description: "Set priority for the day",
-      completed: false,
-      dueDate: today,
-      timeOfDay: "morning",
-      priority: 2,
-    },
-    {
-      userId: demoUser.id,
-      title: "Job Interview Preparation",
-      description: "Review company information and practice responses",
-      completed: false,
-      dueDate: today,
-      timeOfDay: "afternoon",
-      priority: 3,
-    },
-    {
-      userId: demoUser.id,
-      title: "Learning module: Executive function",
-      description: "30 minutes, 2/5 sections completed",
-      completed: false,
-      dueDate: today,
-      timeOfDay: "afternoon",
-      priority: 2,
-    },
-    {
-      userId: demoUser.id,
-      title: "Exercise: 20 minute walk",
-      completed: false,
-      dueDate: today,
-      timeOfDay: "evening",
-      priority: 2,
-    },
-    {
-      userId: demoUser.id,
-      title: "Evening wind-down routine",
-      description: "No screens, calming tea, reading",
-      completed: false,
-      dueDate: today,
-      timeOfDay: "evening",
-      priority: 1,
-    },
-  ]);
+  console.log("Seeding database with shared demo content...");
 
   const [executiveFunctionModule] = await db
     .insert(learningModules)
@@ -333,14 +255,14 @@ export async function seedDatabaseIfEmpty() {
       moduleId: executiveFunctionModule.id,
       title: "Introduction to Time Perception",
       order: 0,
-      completed: true,
+      completed: false,
       content: "Understanding how our brains perceive time and why it can be challenging for those with ADHD and other neurodivergent conditions.",
     },
     {
       moduleId: executiveFunctionModule.id,
       title: "Common Challenges for ADHD",
       order: 1,
-      completed: true,
+      completed: false,
       content: "Exploring specific time management difficulties that people with ADHD face and why traditional approaches often don't work.",
     },
     {
@@ -365,13 +287,6 @@ export async function seedDatabaseIfEmpty() {
       content: "Interactive exercises to practice implementing the time management strategies you've learned.",
     },
   ]);
-
-  await db.insert(userProgress).values({
-    userId: demoUser.id,
-    moduleId: executiveFunctionModule.id,
-    currentSection: 2,
-    percentComplete: 60,
-  });
 
   await db.insert(resources).values([
     {
@@ -400,6 +315,87 @@ export async function seedDatabaseIfEmpty() {
     },
   ]);
 
+  console.log("Shared content seeding complete.");
+}
+
+/**
+ * Seed a fresh, personalized starter set of data for a user the first time they log in
+ * (only if they have no tasks yet). Gives every new real account a populated demo experience.
+ */
+export async function seedUserDataIfEmpty(userId: string) {
+  const existingTasks = await db.select().from(tasks).where(eq(tasks.userId, userId)).limit(1);
+  if (existingTasks.length > 0) {
+    return;
+  }
+
+  const today = new Date();
+
+  await db.insert(tasks).values([
+    {
+      userId,
+      title: "Morning meditation",
+      description: "10 minutes of mindfulness meditation",
+      completed: true,
+      dueDate: today,
+      timeOfDay: "morning",
+      priority: 1,
+    },
+    {
+      userId,
+      title: "Check email and calendar",
+      description: "Set priority for the day",
+      completed: false,
+      dueDate: today,
+      timeOfDay: "morning",
+      priority: 2,
+    },
+    {
+      userId,
+      title: "Job Interview Preparation",
+      description: "Review company information and practice responses",
+      completed: false,
+      dueDate: today,
+      timeOfDay: "afternoon",
+      priority: 3,
+    },
+    {
+      userId,
+      title: "Learning module: Executive function",
+      description: "30 minutes, 2/5 sections completed",
+      completed: false,
+      dueDate: today,
+      timeOfDay: "afternoon",
+      priority: 2,
+    },
+    {
+      userId,
+      title: "Exercise: 20 minute walk",
+      completed: false,
+      dueDate: today,
+      timeOfDay: "evening",
+      priority: 2,
+    },
+    {
+      userId,
+      title: "Evening wind-down routine",
+      description: "No screens, calming tea, reading",
+      completed: false,
+      dueDate: today,
+      timeOfDay: "evening",
+      priority: 1,
+    },
+  ]);
+
+  const [firstModule] = await db.select().from(learningModules).limit(1);
+  if (firstModule) {
+    await db.insert(userProgress).values({
+      userId,
+      moduleId: firstModule.id,
+      currentSection: 2,
+      percentComplete: 40,
+    });
+  }
+
   const emotions = ["Calm", "Happy", "Anxious", "Frustrated", "Sad"];
   const intensities = [8, 7, 5, 6, 4, 6, 7];
   const emotionRows = [];
@@ -407,7 +403,7 @@ export async function seedDatabaseIfEmpty() {
     const logDate = new Date(today);
     logDate.setDate(today.getDate() - i);
     emotionRows.push({
-      userId: demoUser.id,
+      userId,
       emotion: emotions[Math.floor(Math.random() * emotions.length)],
       intensity: intensities[i],
       notes: "",
@@ -419,31 +415,29 @@ export async function seedDatabaseIfEmpty() {
   const dayAgo = today.getTime() - 24 * 60 * 60 * 1000;
   await db.insert(chatMessages).values([
     {
-      userId: demoUser.id,
+      userId,
       content: "I have a job interview tomorrow and I'm feeling anxious about it.",
       isUser: true,
       timestamp: new Date(dayAgo),
     },
     {
-      userId: demoUser.id,
+      userId,
       content: "It's completely normal to feel anxious before an interview. Would you like some strategies to help manage interview anxiety?",
       isUser: false,
       timestamp: new Date(dayAgo + 1000),
     },
     {
-      userId: demoUser.id,
+      userId,
       content: "Yes, that would be really helpful.",
       isUser: true,
       timestamp: new Date(dayAgo + 2000),
     },
     {
-      userId: demoUser.id,
+      userId,
       content:
         "Here are some strategies:\n1. Prepare thoroughly - research the company and practice common questions\n2. Use the 4-7-8 breathing technique to calm your nervous system\n3. Arrive early to reduce time pressure\n4. Consider disclosing your neurodivergence if you need accommodations\n5. Focus on your strengths and unique perspective\n\nWould you like to practice with some common interview questions?",
       isUser: false,
       timestamp: new Date(dayAgo + 3000),
     },
   ]);
-
-  console.log("Database seeding complete.");
 }

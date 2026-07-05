@@ -18,11 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 
-type DailyPlannerProps = {
-  userId: number;
-};
-
-export default function DailyPlanner({ userId }: DailyPlannerProps) {
+export default function DailyPlanner() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskTimeOfDay, setNewTaskTimeOfDay] = useState('morning');
@@ -30,9 +26,9 @@ export default function DailyPlanner({ userId }: DailyPlannerProps) {
   const { toast } = useToast();
   
   const { data: tasks, isPending } = useQuery({
-    queryKey: ['/api/tasks', userId],
+    queryKey: ['/api/tasks'],
     queryFn: async () => {
-      const res = await fetch(`/api/tasks/${userId}`);
+      const res = await fetch('/api/tasks', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch tasks');
       return res.json();
     }
@@ -43,16 +39,16 @@ export default function DailyPlanner({ userId }: DailyPlannerProps) {
       return await apiRequest('PUT', `/api/tasks/${id}`, { completed });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks', userId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
     }
   });
   
   const createTaskMutation = useMutation({
-    mutationFn: async (task: { userId: number, title: string, description?: string, timeOfDay: string }) => {
+    mutationFn: async (task: { title: string, description?: string, timeOfDay: string }) => {
       return await apiRequest('POST', '/api/tasks', task);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks', userId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
       setNewTaskTitle('');
       setNewTaskDescription('');
       setIsDialogOpen(false);
@@ -78,7 +74,6 @@ export default function DailyPlanner({ userId }: DailyPlannerProps) {
     }
     
     createTaskMutation.mutate({
-      userId,
       title: newTaskTitle,
       description: newTaskDescription || undefined,
       timeOfDay: newTaskTimeOfDay

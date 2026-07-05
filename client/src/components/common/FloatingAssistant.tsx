@@ -20,13 +20,10 @@ export default function FloatingAssistant() {
   const [message, setMessage] = useState('');
   const { toast } = useToast();
   
-  // In a real app, you would get the user ID from auth context
-  const userId = 1;
-  
   const { data: chatHistory, isPending: isLoadingChat } = useQuery({
-    queryKey: ['/api/chat', userId],
+    queryKey: ['/api/chat'],
     queryFn: async () => {
-      const res = await fetch(`/api/chat/${userId}?limit=20`);
+      const res = await fetch('/api/chat?limit=20', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch chat history');
       return res.json();
     },
@@ -36,7 +33,6 @@ export default function FloatingAssistant() {
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const res = await apiRequest('POST', '/api/chat', {
-        userId,
         content,
         isUser: true
       });
@@ -44,7 +40,7 @@ export default function FloatingAssistant() {
     },
     onSuccess: () => {
       setMessage('');
-      queryClient.invalidateQueries({ queryKey: ['/api/chat', userId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat'] });
     },
     onError: () => {
       toast({

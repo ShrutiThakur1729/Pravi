@@ -8,9 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowRight, BookOpen, Clock, CheckCircle2 } from "lucide-react";
 
 export default function Learning() {
-  // In a real application, we would get userId from authentication context
-  const userId = 1;
-  
   const { data: modules, isPending } = useQuery({
     queryKey: ['/api/learning-modules'],
     queryFn: async () => {
@@ -21,12 +18,12 @@ export default function Learning() {
   });
   
   const { data: progressData, isPending: isLoadingProgress } = useQuery({
-    queryKey: ['/api/learning-progress', userId],
+    queryKey: ['/api/learning-progress', 1],
     queryFn: async () => {
       // In a real implementation, this would fetch progress for all modules
       // Here we're just using our existing endpoint for a single module
       const moduleId = 1;
-      const res = await fetch(`/api/learning-progress/${userId}/${moduleId}`);
+      const res = await fetch(`/api/learning-progress/${moduleId}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch progress');
       return res.json();
     }

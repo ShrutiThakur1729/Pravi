@@ -10,20 +10,11 @@ import {
   CheckSquare
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
 
-type WelcomeSectionProps = {
-  userId: number;
-};
-
-export default function WelcomeSection({ userId }: WelcomeSectionProps) {
-  const { data: user, isPending: isLoadingUser } = useQuery({
-    queryKey: [`/api/user/${userId}`],
-    queryFn: async () => {
-      const res = await fetch(`/api/user/${userId}`);
-      if (!res.ok) throw new Error('Failed to fetch user');
-      return res.json();
-    }
-  });
+export default function WelcomeSection() {
+  const { user, isLoading: isLoadingUser } = useAuth();
+  const displayName = user?.firstName || user?.email?.split('@')[0] || 'there';
   
   // In a real app, these would be fetched from API
   const focusScore = 85;
@@ -42,7 +33,7 @@ export default function WelcomeSection({ userId }: WelcomeSectionProps) {
             ) : (
               <Avatar className="w-12 h-12 bg-primary-100 dark:bg-primary-900">
                 <AvatarFallback className="text-primary-600 dark:text-primary-300 font-medium">
-                  {user?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                  {displayName?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
             )}
@@ -56,7 +47,7 @@ export default function WelcomeSection({ userId }: WelcomeSectionProps) {
               </>
             ) : (
               <>
-                <h2 className="text-2xl font-heading font-semibold mb-2">Welcome back, {user?.name?.split(' ')[0] || 'User'}!</h2>
+                <h2 className="text-2xl font-heading font-semibold mb-2">Welcome back, {displayName}!</h2>
                 <p className="text-neutral-600 dark:text-neutral-400 mb-4">
                   Your progress this week has been impressive. You've completed 3 learning modules and improved your focus scores by 15%.
                 </p>

@@ -11,11 +11,10 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 
 type LearningModuleProps = {
-  userId: number;
   moduleId?: number;
 };
 
-export default function LearningModule({ userId, moduleId = 1 }: LearningModuleProps) {
+export default function LearningModule({ moduleId = 1 }: LearningModuleProps) {
   const { data: module, isPending: isLoadingModule } = useQuery({
     queryKey: [`/api/learning-modules/${moduleId}`],
     queryFn: async () => {
@@ -35,9 +34,9 @@ export default function LearningModule({ userId, moduleId = 1 }: LearningModuleP
   });
   
   const { data: progress, isPending: isLoadingProgress } = useQuery({
-    queryKey: [`/api/learning-progress`, userId, moduleId],
+    queryKey: [`/api/learning-progress`, moduleId],
     queryFn: async () => {
-      const res = await fetch(`/api/learning-progress/${userId}/${moduleId}`);
+      const res = await fetch(`/api/learning-progress/${moduleId}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch progress');
       return res.json();
     }

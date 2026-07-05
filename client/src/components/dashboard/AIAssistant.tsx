@@ -7,14 +7,12 @@ import { BrainCircuit } from 'lucide-react';
 type Suggestion = string;
 
 type AIAssistantProps = {
-  userId: number;
   initialMessage?: string;
   initialSuggestions?: Suggestion[];
 };
 
 export default function AIAssistant({ 
-  userId, 
-  initialMessage = "Hi Jamie! I noticed you have a job interview tomorrow. Would you like to practice some interview questions or review calming techniques?", 
+  initialMessage = "Hi there! I noticed you have a job interview tomorrow. Would you like to practice some interview questions or review calming techniques?", 
   initialSuggestions = ["Practice Interview", "Calming Techniques", "Something Else"] 
 }: AIAssistantProps) {
   const [message, setMessage] = useState(initialMessage);
@@ -23,7 +21,6 @@ export default function AIAssistant({
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const res = await apiRequest('POST', '/api/chat', {
-        userId,
         content,
         isUser: true
       });
