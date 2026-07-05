@@ -2,7 +2,7 @@ import express, { Router, Request, Response } from "express";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { processMessage, generateLearningRecommendations, generateCopingStrategies } from "./openai";
+import { processMessage, generateLearningRecommendations, generateCopingStrategies } from "./gemini";
 import { z } from "zod";
 import { insertTaskSchema, insertEmotionLogSchema, insertChatMessageSchema } from "@shared/schema";
 
@@ -66,7 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // TASK ROUTES
   apiRouter.get("/tasks/:userId", async (req: Request, res: Response) => {
     try {
-      const { userId } = idParamSchema.parse({ id: req.params.userId });
+      const { id: userId } = idParamSchema.parse({ id: req.params.userId });
       const tasks = await storage.getTasks(userId);
       res.json(tasks);
     } catch (error) {
@@ -195,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // EMOTION TRACKING ROUTES
   apiRouter.get("/emotions/:userId", async (req: Request, res: Response) => {
     try {
-      const { userId } = idParamSchema.parse({ id: req.params.userId });
+      const { id: userId } = idParamSchema.parse({ id: req.params.userId });
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
       
       const logs = await storage.getEmotionLogs(userId, limit);
@@ -245,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI ASSISTANT ROUTES
   apiRouter.get("/chat/:userId", async (req: Request, res: Response) => {
     try {
-      const { userId } = idParamSchema.parse({ id: req.params.userId });
+      const { id: userId } = idParamSchema.parse({ id: req.params.userId });
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
       
       const messages = await storage.getChatMessages(userId, limit);

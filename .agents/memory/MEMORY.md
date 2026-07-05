@@ -1,0 +1,1 @@
+- [Gemini API key quota](gemini-quota.md) — this project's GEMINI_API_KEY has a 0-quota free tier for gemini-2.0-flash; only that model resolves (others 404/403), calls hit 429.
