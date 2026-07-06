@@ -17,7 +17,12 @@ async function fetchUser(): Promise<User | null> {
       credentials: "include",
     });
 
-    if (response.status === 401 || response.status === 404) {
+    const contentType = response.headers.get("content-type") || "";
+    if (
+      response.status === 401 ||
+      response.status === 404 ||
+      !contentType.includes("application/json")
+    ) {
       return null;
     }
 

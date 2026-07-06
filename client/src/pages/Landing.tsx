@@ -53,7 +53,8 @@ export default function Landing() {
   const handleLogin = async () => {
     try {
       const res = await fetch("/api/auth/user").catch(() => null);
-      if (res && res.status !== 404) {
+      const contentType = res?.headers.get("content-type") || "";
+      if (res && res.status !== 404 && contentType.includes("application/json")) {
         window.location.href = "/api/login";
       } else {
         const mockUser = {
