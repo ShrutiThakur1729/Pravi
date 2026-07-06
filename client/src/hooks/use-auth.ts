@@ -2,22 +2,48 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 
 async function fetchUser(): Promise<User | null> {
-  const response = await fetch("/api/auth/user", {
-    credentials: "include",
-  });
+  // If local storage has a demo user, use it
+  const demoUser = localStorage.getItem("pravi_demo_user");
+  if (demoUser) {
+    try {
+      return JSON.parse(demoUser);
+    } catch {
+      localStorage.removeItem("pravi_demo_user");
+    }
+  }
 
-  if (response.status === 401) {
+  try {
+    const response = await fetch("/api/auth/user", {
+      credentials: "include",
+    });
+
+    if (response.status === 401 || response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`${response.status}: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    // Fallback to null (unauthenticated) if API server is not available (like Netlify static host)
     return null;
   }
-
-  if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
 }
 
 async function logout(): Promise<void> {
+  if (localStorage.getItem("pravi_demo_user")) {
+    localStorage.removeItem("pravi_demo_user");
+    localStorage.removeItem("pravi_demo_onboarding");
+    localStorage.removeItem("pravi_demo_tasks");
+    localStorage.removeItem("pravi_demo_emotions");
+    localStorage.removeItem("pravi_demo_sessions");
+    localStorage.removeItem("pravi_demo_progress");
+    localStorage.removeItem("pravi_demo_chat");
+    window.location.href = "/";
+    return;
+  }
   window.location.href = "/api/logout";
 }
 
@@ -45,3 +71,4 @@ export function useAuth() {
     isLoggingOut: logoutMutation.isPending,
   };
 }
+

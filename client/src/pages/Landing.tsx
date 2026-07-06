@@ -50,8 +50,25 @@ const features = [
 ];
 
 export default function Landing() {
-  const handleLogin = () => {
-    window.location.href = "/api/login";
+  const handleLogin = async () => {
+    try {
+      const res = await fetch("/api/auth/user").catch(() => null);
+      if (res && res.status !== 404) {
+        window.location.href = "/api/login";
+      } else {
+        const mockUser = {
+          id: "demo-user",
+          email: "demo@pravi.app",
+          firstName: "Demo",
+          lastName: "User",
+          profileImageUrl: "",
+        };
+        localStorage.setItem("pravi_demo_user", JSON.stringify(mockUser));
+        window.location.reload();
+      }
+    } catch {
+      window.location.href = "/api/login";
+    }
   };
 
   return (
