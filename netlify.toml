@@ -1,15 +1,18 @@
 [build]
   command = "vite build"
   publish = "dist/public"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
 
+# Haru AI function route
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  from = "/.netlify/functions/haru"
+  to = "/.netlify/functions/haru"
   status = 200
 
+# SPA catch-all — must be last
 [[redirects]]
   from = "/*"
   to = "/index.html"
